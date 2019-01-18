@@ -35,6 +35,7 @@ class VisualReasoningParameters(torch.nn.Module):
                  text_encoding_dim: int,
                  hidden_dim: int,
                  num_answers: int) -> None:
+        super().__init__()
         # The paper calls these "convolutions", but if you look at the code, it just does a 1x1
         # convolution, which is a linear transformation on the last dimension.  I'm still calling
         # them "convs" here, to match the original paper, and because they are operating on
@@ -42,7 +43,7 @@ class VisualReasoningParameters(torch.nn.Module):
         # them.  All of these parameters try to match what you see in table 1 of the paper, where
         # we write "W" as "linear".
         self.find_conv1 = torch.nn.Linear(image_encoding_dim, hidden_dim)
-        self.find_conv2 = torch.nn.Linear(image_encoding_dim, hidden_dim)
+        self.find_conv2 = torch.nn.Linear(hidden_dim, 1)
         self.find_linear = torch.nn.Linear(text_encoding_dim, hidden_dim)
         self.relocate_conv1 = torch.nn.Linear(image_encoding_dim, hidden_dim)
         self.relocate_conv2 = torch.nn.Linear(image_encoding_dim, hidden_dim)
@@ -90,7 +91,7 @@ class VisualReasoningLanguage(DomainLanguage):
     def find(self, attended_question: Tensor) -> Attention:
         conv1 = self.parameters.find_conv1
         conv2 = self.parameters.find_conv2
-        return conv2(conv1(self.image_features) * attended_question)
+        return conv2(conv1(self.image_features) * attended_question).squeeze()
 
     @predicate_with_side_args(['attended_question'])
     def relocate(self, attention: Attention, attended_question: Tensor) -> Attention:
@@ -101,17 +102,17 @@ class VisualReasoningLanguage(DomainLanguage):
         attended_image = (attention * self.image_features).sum(dim=[0, 1])
         return conv2(conv1(self.image_features) * linear1(attended_image) * linear2(attended_question))
 
-    @predicate
-    def and_(self, attention1: Attention, attention2: Attention) -> Attention:
-        return torch.max(torch.stack([attention1, attention2]), dim=-1)
-
-    @predicate
-    def or_(self, attention1: Attention, attention2: Attention) -> Attention:
-        return torch.min(torch.stack([attention1, attention2]), dim=-1)
-
     @predicate_with_side_args(['attended_question'])
     def filter(self, attention: Attention, attended_question: Tensor) -> Attention:
         return self.and_(attention, self.find(attended_question))
+
+    @predicate
+    def and_(self, attention1: Attention, attention2: Attention) -> Attention:
+        return torch.max(torch.stack([attention1, attention2], dim=0), dim=0)[0]
+
+    @predicate
+    def or_(self, attention1: Attention, attention2: Attention) -> Attention:
+        return torch.min(torch.stack([attention1, attention2], dim=0), dim=0)[0]
 
     @predicate
     def exist(self, attention: Attention) -> Answer:

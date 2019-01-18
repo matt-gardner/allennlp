@@ -285,6 +285,7 @@ class DomainLanguageTest(AllenNlpTestCase):
         class SideArgumentLanguage(DomainLanguage):
             def __init__(self) -> None:
                 super().__init__(start_types={int}, allowed_constants={'1': 1, '2': 2, '3': 3})
+
             @predicate_with_side_args(['num2'])
             def add(self, num1: int, num2: int) -> int:
                 return num1 + num2
