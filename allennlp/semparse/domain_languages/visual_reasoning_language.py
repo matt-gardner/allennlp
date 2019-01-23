@@ -36,6 +36,9 @@ class VisualReasoningParameters(torch.nn.Module):
                  hidden_dim: int,
                  num_answers: int) -> None:
         super().__init__()
+        if text_encoding_dim != hidden_dim:
+            raise ConfigurationError("The current implementation of `find` requires that "
+                                     "hidden_dim == text_encoding_dim.")
         # The paper calls these "convolutions", but if you look at the code, it just does a 1x1
         # convolution, which is a linear transformation on the last dimension.  I'm still calling
         # them "convs" here, to match the original paper, and because they are operating on

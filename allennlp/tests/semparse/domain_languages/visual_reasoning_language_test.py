@@ -128,9 +128,35 @@ class VisualReasoningLanguageTest(AllenNlpTestCase):
         # computation performed by each function, because there are learned parameters in there.
         # We'll treat this as similar to a model test, just making sure the tensor operations work.
         attended_question = {'attended_question': torch.rand(self.text_encoding_dim)}
+
         # A simple one to start with: (exist find)
         action_sequence = ['@start@ -> Answer',
                            'Answer -> [<Attention:Answer>, Attention]',
                            '<Attention:Answer> -> exist',
+                           'Attention -> find']
+        self.language.execute_action_sequence(action_sequence, [attended_question] * len(action_sequence))
+
+        # (describe (and_ find find))
+        action_sequence = ['@start@ -> Answer',
+                           'Answer -> [<Attention:Answer>, Attention]',
+                           '<Attention:Answer> -> describe',
+                           'Attention -> [<Attention,Attention:Attention>, Attention, Attention]',
+                           '<Attention,Attention:Attention> -> and_',
+                           'Attention -> find',
+                           'Attention -> find']
+        self.language.execute_action_sequence(action_sequence, [attended_question] * len(action_sequence))
+
+        # (compare (relocate find) (filter (or_ find find)))
+        action_sequence = ['@start@ -> Answer',
+                           'Answer -> [<Attention,Attention:Answer>, Attention, Attention]',
+                           '<Attention,Attention:Answer> -> compare',
+                           'Attention -> [<Attention:Attention>, Attention]',
+                           '<Attention:Attention> -> relocate',
+                           'Attention -> find',
+                           'Attention -> [<Attention:Attention>, Attention]',
+                           '<Attention:Attention> -> filter',
+                           'Attention -> [<Attention,Attention:Attention>, Attention, Attention]',
+                           '<Attention,Attention:Attention> -> or_',
+                           'Attention -> find',
                            'Attention -> find']
         self.language.execute_action_sequence(action_sequence, [attended_question] * len(action_sequence))
