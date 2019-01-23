@@ -64,7 +64,7 @@ class VisualReasoningLanguageTest(AllenNlpTestCase):
         new_attention = self.language.relocate(attention, attended_question)
         assert new_attention.size() == (self.image_height, self.image_width)
 
-    def test_relocate_returns_correct_shape(self):
+    def test_filter_returns_correct_shape(self):
         attended_question = torch.rand(self.text_encoding_dim)
         attention = torch.rand(self.image_height, self.image_width)
         new_attention = self.language.filter(attention, attended_question)
@@ -133,4 +133,4 @@ class VisualReasoningLanguageTest(AllenNlpTestCase):
                            'Answer -> [<Attention:Answer>, Attention]',
                            '<Attention:Answer> -> exist',
                            'Attention -> find']
-        #self.language.execute_action_sequence(action_sequence, [attended_question] * len(action_sequence))
+        self.language.execute_action_sequence(action_sequence, [attended_question] * len(action_sequence))

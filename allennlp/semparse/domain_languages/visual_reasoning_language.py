@@ -46,8 +46,8 @@ class VisualReasoningParameters(torch.nn.Module):
         self.find_conv2 = torch.nn.Linear(hidden_dim, 1)
         self.find_linear = torch.nn.Linear(text_encoding_dim, hidden_dim)
         self.relocate_conv1 = torch.nn.Linear(image_encoding_dim, hidden_dim)
-        self.relocate_conv2 = torch.nn.Linear(image_encoding_dim, hidden_dim)
-        self.relocate_linear1 = torch.nn.Linear(hidden_dim, hidden_dim)
+        self.relocate_conv2 = torch.nn.Linear(hidden_dim, 1)
+        self.relocate_linear1 = torch.nn.Linear(image_encoding_dim, hidden_dim)
         self.relocate_linear2 = torch.nn.Linear(text_encoding_dim, hidden_dim)
         self.exist_linear = torch.nn.Linear(image_height * image_width, num_answers)
         self.count_linear = torch.nn.Linear(image_height * image_width, num_answers)
@@ -99,8 +99,9 @@ class VisualReasoningLanguage(DomainLanguage):
         conv2 = self.parameters.relocate_conv2
         linear1 = self.parameters.relocate_linear1
         linear2 = self.parameters.relocate_linear2
-        attended_image = (attention * self.image_features).sum(dim=[0, 1])
-        return conv2(conv1(self.image_features) * linear1(attended_image) * linear2(attended_question))
+        attended_image = (attention.unsqueeze(-1) * self.image_features).sum(dim=[0, 1])
+        return conv2(conv1(self.image_features) * linear1(attended_image) *
+                     linear2(attended_question)).squeeze()
 
     @predicate_with_side_args(['attended_question'])
     def filter(self, attention: Attention, attended_question: Tensor) -> Attention:
@@ -129,7 +130,7 @@ class VisualReasoningLanguage(DomainLanguage):
         linear1 = self.parameters.describe_linear1
         linear2 = self.parameters.describe_linear2
         linear3 = self.parameters.describe_linear3
-        attended_image = (attention * self.image_features).sum(dim=[0, 1])
+        attended_image = (attention.unsqueeze(-1) * self.image_features).sum(dim=[0, 1])
         return linear1(linear2(attended_image) * linear3(attended_question))
 
     @predicate_with_side_args(['attended_question'])
@@ -138,8 +139,8 @@ class VisualReasoningLanguage(DomainLanguage):
         linear2 = self.parameters.compare_linear2
         linear3 = self.parameters.compare_linear3
         linear4 = self.parameters.compare_linear4
-        attended_image1 = (attention1 * self.image_features).sum(dim=[0, 1])
-        attended_image2 = (attention2 * self.image_features).sum(dim=[0, 1])
+        attended_image1 = (attention1.unsqueeze(-1) * self.image_features).sum(dim=[0, 1])
+        attended_image2 = (attention2.unsqueeze(-1) * self.image_features).sum(dim=[0, 1])
         return linear1(linear2(attended_image1) * linear3(attended_image2) * linear4(attended_question))
 
     @predicate
