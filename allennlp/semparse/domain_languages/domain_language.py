@@ -179,6 +179,7 @@ def predicate(function: Callable) -> Callable:  # pylint: disable=invalid-name
     setattr(function, '_is_predicate', True)
     return function
 
+
 def predicate_with_side_args(side_arguments: List[str]) -> Callable:  # pylint: disable=invalid-name
     """
     Like :func:`predicate`, but used when some of the arguments to the function are meant to be

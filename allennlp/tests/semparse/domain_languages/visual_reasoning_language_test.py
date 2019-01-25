@@ -2,7 +2,9 @@ import torch
 
 from allennlp.common.testing import AllenNlpTestCase
 from allennlp.semparse.domain_languages import VisualReasoningLanguage
-from allennlp.semparse.domain_languages.visual_reasoning_language import VisualReasoningParameters
+from allennlp.semparse.domain_languages.visual_reasoning_language import (VisualReasoningParameters,
+                                                                          convert_reverse_polish_to_logical_form)
+
 from allennlp.tests.semparse.domain_languages.domain_language_test import check_productions_match
 
 
@@ -39,6 +41,7 @@ class VisualReasoningLanguageTest(AllenNlpTestCase):
                                 ['Answer'])
         check_productions_match(productions['Attention'],
                                 ['find',
+                                 'scene',
                                  '[<Attention:Attention>, Attention]',
                                  '[<Attention,Attention:Attention>, Attention, Attention]'])
         check_productions_match(productions['Answer'],
@@ -47,7 +50,7 @@ class VisualReasoningLanguageTest(AllenNlpTestCase):
         check_productions_match(productions['<Attention:Answer>'],
                                 ['exist', 'count', 'describe'])
         check_productions_match(productions['<Attention:Attention>'],
-                                ['relocate', 'filter'])
+                                ['relocate', 'filter', 'find_same_as'])
         check_productions_match(productions['<Attention,Attention:Answer>'],
                                 ['compare', 'count_equals', 'more', 'less'])
         check_productions_match(productions['<Attention,Attention:Attention>'],
@@ -160,3 +163,42 @@ class VisualReasoningLanguageTest(AllenNlpTestCase):
                            'Attention -> find',
                            'Attention -> find']
         self.language.execute_action_sequence(action_sequence, [attended_question] * len(action_sequence))
+
+    def test_convert_reverse_polish_to_logical_form(self):
+        # This is just taking a bunch of examples from the n2nmn datasets, trying to be sure we
+        # cover all of the predicates.
+        predicates = ['_Find', '_Find', '_Transform', '_And', '_Answer']
+        logical_form = convert_reverse_polish_to_logical_form(predicates)
+        assert logical_form == '(exist (and_ (relocate find) find))'
+
+        predicates = ['_Find', '_Find', '_Transform', '_Transform', '_And', '_Answer']
+        logical_form = convert_reverse_polish_to_logical_form(predicates)
+        assert logical_form == '(exist (and_ (relocate (relocate find)) find))'
+
+        predicates = ['_Find', '_Find', '_And', '_Answer']
+        logical_form = convert_reverse_polish_to_logical_form(predicates)
+        assert logical_form == '(exist (and_ find find))'
+
+        predicates = ['_Find', '_Filter', '_Filter', '_Scene', '_MoreNum']
+        logical_form = convert_reverse_polish_to_logical_form(predicates)
+        assert logical_form == '(more scene (filter (filter find)))'
+
+        predicates = ['_Find', '_Filter', '_FindSameProperty', '_Filter', '_Filter', '_Describe']
+        logical_form = convert_reverse_polish_to_logical_form(predicates)
+        assert logical_form == '(describe (filter (filter (find_same_as (filter find)))))'
+
+        predicates = ['_Find', '_Filter', '_Transform', '_Filter', '_Find', '_Filter', '_SameProperty']
+        logical_form = convert_reverse_polish_to_logical_form(predicates)
+        assert logical_form == '(compare (filter find) (filter (relocate (filter find))))'
+
+        predicates = ['_Find', '_Find', '_EqualNum']
+        logical_form = convert_reverse_polish_to_logical_form(predicates)
+        assert logical_form == '(count_equals find find)'
+
+        predicates = ['_Find', '_Find', '_Find', '_Or', '_LessNum']
+        logical_form = convert_reverse_polish_to_logical_form(predicates)
+        assert logical_form == '(less (or_ find find) find)'
+
+        predicates = ['_Find', '_Filter', '_FindSameProperty', '_Count']
+        logical_form = convert_reverse_polish_to_logical_form(predicates)
+        assert logical_form == '(count (find_same_as (filter find)))'
