@@ -1,0 +1,1 @@
+from allennlp.data.dataset_readers.visual_question_answering.shapes_reader import ShapesReader

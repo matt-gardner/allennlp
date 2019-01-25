@@ -101,8 +101,11 @@ class VisualReasoningLanguage(DomainLanguage):
         super().__init__(start_types={Answer})
         self.image_features = image_features
         self.parameters = parameters
-        ones = image_features.new_ones(self.parameters.image_height, self.parameters.image_width)
-        self.uniform_attention = ones / self.parameters.image_height / self.parameters.image_width
+        if parameters:
+            # We need to be able to instantiate an empty Language object in a few places, mostly so
+            # we can interact with the grammar.
+            ones = image_features.new_ones(self.parameters.image_height, self.parameters.image_width)
+            self.uniform_attention = ones / self.parameters.image_height / self.parameters.image_width
 
     @predicate
     def scene(self) -> Attention:
