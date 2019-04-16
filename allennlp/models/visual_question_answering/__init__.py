@@ -1,0 +1,1 @@
+from allennlp.models.visual_question_answering.end_to_end_module_network import EndToEndModuleNetwork

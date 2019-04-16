@@ -1,0 +1,1 @@
+from allennlp.modules.image_encoders.image_encoder import ImageEncoder

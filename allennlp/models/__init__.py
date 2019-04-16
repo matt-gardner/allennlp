@@ -25,6 +25,7 @@ from allennlp.models.semantic_parsing.atis.atis_semantic_parser import AtisSeman
 from allennlp.models.semantic_parsing.text2sql_parser import Text2SqlParser
 from allennlp.models.semantic_role_labeler import SemanticRoleLabeler
 from allennlp.models.simple_tagger import SimpleTagger
+from allennlp.models.visual_question_answering import EndToEndModuleNetwork
 from allennlp.models.esim import ESIM
 from allennlp.models.bimpm import BiMpm
 from allennlp.models.graph_parser import GraphParser
