@@ -14,13 +14,12 @@ from allennlp.semparse.executors import SqlExecutor
 from allennlp.models.model import Model
 from allennlp.modules import Attention, ImageEncoder, Seq2SeqEncoder, TextFieldEmbedder, Embedding
 from allennlp.nn import util
-from allennlp.semparse.domain_languages.visual_reasoning_language import (VisualReasoningLanguage,
-                                                                          VisualReasoningParameters)
-from allennlp.semparse.contexts.atis_sql_table_context import NUMERIC_NONTERMINALS
-from allennlp.semparse.contexts.sql_context_utils import action_sequence_to_sql
+from allennlp.semparse.domain_languages.visual_reasoning_shapes_language import (
+        VisualReasoningShapesLanguage, VisualReasoningShapesParameters)
+from allennlp.semparse.domain_languages.domain_language import START_SYMBOL
 from allennlp.state_machines.states import GrammarBasedState
 from allennlp.state_machines.transition_functions.basic_transition_function import BasicTransitionFunction
-from allennlp.state_machines import BeamSearch
+from allennlp.state_machines import BeamSearch, ConstrainedBeamSearch
 from allennlp.state_machines.trainers import MaximumMarginalLikelihood
 from allennlp.state_machines.states import GrammarStatelet, RnnStatelet
 from allennlp.training.metrics import Average
@@ -120,7 +119,7 @@ class EndToEndModuleNetwork(Model):
 
         image_feature_shape = image_encoder.get_output_shape_for_input(image_shape)
         image_encoding_dim, image_height, image_width = image_feature_shape
-        self._language_parameters = VisualReasoningParameters(
+        self._language_parameters = VisualReasoningShapesParameters(
                 image_height=image_height,
                 image_width=image_width,
                 image_encoding_dim=image_encoding_dim,
@@ -150,13 +149,13 @@ class EndToEndModuleNetwork(Model):
 
         # Our language is constant across instances, so we just create one up front that we can
         # re-use to construct the `GrammarStatelet`.
-        self._world = VisualReasoningLanguage(None, None)
+        self._world = VisualReasoningShapesLanguage(None, None, None)
 
     @overrides
     def forward(self,  # type: ignore
                 image: torch.Tensor,
                 utterance: Dict[str, torch.LongTensor],
-                actions: List[ProductionRule],
+                actions: List[List[ProductionRule]],
                 target_action_sequence: torch.LongTensor = None,
                 denotation: torch.Tensor = None) -> Dict[str, torch.Tensor]:
         # pylint: disable=arguments-differ
@@ -175,11 +174,11 @@ class EndToEndModuleNetwork(Model):
         utterance : Dict[str, torch.LongTensor]
             The output of ``TextField.as_array()`` applied on the utterance ``TextField``. This will
             be passed through a ``TextFieldEmbedder`` and then through an encoder.
-        actions : ``List[ProductionRule]``
+        actions : ``List[List[ProductionRule]]``
             A list of all possible actions available in the grammar (which is the same for each
-            instance), indexed into a ``ProductionRule`` using a ``ProductionRuleField``.  We will
-            embed all of these and use the embeddings to determine which action to take at each
-            timestep in the decoder.
+            instance, but duplicated, because of how our data processing works...), indexed into a
+            ``ProductionRule`` using a ``ProductionRuleField``.  We will embed all of these and use
+            the embeddings to determine which action to take at each timestep in the decoder.
         target_action_sequence : torch.Tensor, optional (default=None)
             The action sequence for the correct action sequence, where each action is an index into
             the list of possible actions.  This tensor has shape ``(batch_size, sequence_length,
@@ -213,7 +212,7 @@ class EndToEndModuleNetwork(Model):
                                                     keep_final_unfinished_states=False)
 
         action_mapping = {}
-        for action_index, action in enumerate(actions):
+        for action_index, action in enumerate(actions[0]):
             action_mapping[action_index] = action[0]
 
         outputs: Dict[str, Any] = {'action_mapping': action_mapping}
@@ -227,22 +226,24 @@ class EndToEndModuleNetwork(Model):
                 outputs['best_action_sequence'].append([])
                 outputs['debug_info'].append([])
                 continue
-            world = VisualReasoningLanguage(image_features[batch_index], self._language_parameters)
+            world = VisualReasoningShapesLanguage(image_features[batch_index],
+                                                  initial_state.rnn_state[batch_index].encoder_outputs[batch_index],
+                                                  self._language_parameters)
             denotation_log_prob_list = []
             # TODO(mattg): maybe we want to limit the number of states we evaluate (programs we
             # execute) at test time, just for efficiency.
             for state_index, state in enumerate(final_states[batch_index]):
                 action_indices = state.action_history[0]
                 action_strings = [action_mapping[action_index] for action_index in action_indices]
-                question_attention = [info['question_attention'] for info in state.debug_info[0]]
                 # Shape: (num_denotations,)
-                state_denotation_log_probs = world.execute_action_sequence(action_strings, question_attention)
+                state_denotation_log_probs = world.execute_action_sequence(action_strings,
+                                                                           state.debug_info[0])
                 # P(denotation | parse) * P(parse | question)
                 denotation_log_prob_list.append(state_denotation_log_probs + state.score[0])
                 if state_index == 0:
                     outputs['best_action_sequence'].append(action_strings)
                     outputs['debug_info'].append(state.debug_info[0])
-                    if target_action_sequence:
+                    if target_action_sequence is not None:
                         targets = target_action_sequence[batch_index].data
                         program_correct = self._action_history_match(action_indices, targets)
                         self._program_accuracy(program_correct)
@@ -253,7 +254,7 @@ class EndToEndModuleNetwork(Model):
             # \Sum_parse P(denotation | parse) * P(parse | question) = P(denotation | question)
             # Shape: (num_denotations,)
             marginalized_denotation_log_probs = util.logsumexp(denotation_log_probs, dim=0)
-            if denotation:
+            if denotation is not None:
                 losses.append(-marginalized_denotation_log_probs[denotation[batch_index]])
                 self._denotation_accuracy(marginalized_denotation_log_probs, denotation[batch_index])
         if losses:
@@ -305,7 +306,7 @@ class EndToEndModuleNetwork(Model):
                                                  utterance_mask_list))
 
 
-        initial_grammar_state = [self._create_grammar_state(actions) for _ in range(batch_size)]
+        initial_grammar_state = [self._create_grammar_state(actions[i]) for i in range(batch_size)]
 
         initial_state = GrammarBasedState(batch_indices=list(range(batch_size)),
                                           action_history=[[] for _ in range(batch_size)],
@@ -377,7 +378,7 @@ class EndToEndModuleNetwork(Model):
                                                        global_output_embeddings,
                                                        list(global_action_ids))
 
-        return GrammarStatelet([], translated_valid_actions, self._world.is_nonterminal)
+        return GrammarStatelet([START_SYMBOL], translated_valid_actions, self._world.is_nonterminal)
 
     @overrides
     def decode(self, output_dict: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:

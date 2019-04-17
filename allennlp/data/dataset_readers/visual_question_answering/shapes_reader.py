@@ -12,8 +12,8 @@ from allennlp.data.fields import ArrayField, IndexField, LabelField, ListField, 
 from allennlp.data.instance import Instance
 from allennlp.data.token_indexers import TokenIndexer, SingleIdTokenIndexer
 from allennlp.data.tokenizers import Tokenizer, WordTokenizer
-from allennlp.semparse.domain_languages.visual_reasoning_language import \
-        VisualReasoningLanguage, convert_reverse_polish_to_logical_form
+from allennlp.semparse.domain_languages.visual_reasoning_language import convert_reverse_polish_to_logical_form
+from allennlp.semparse.domain_languages.visual_reasoning_shapes_language import VisualReasoningShapesLanguage
 
 
 @DatasetReader.register("shapes")
@@ -43,7 +43,7 @@ class ShapesReader(DatasetReader):
         super().__init__(lazy)
         self._tokenizer = tokenizer or WordTokenizer()
         self._token_indexers = token_indexers or {'tokens': SingleIdTokenIndexer()}
-        self._language = VisualReasoningLanguage(None, None)
+        self._language = VisualReasoningShapesLanguage(None, None, None)
         self._production_rules = self._language.all_possible_productions()
         self._action_map = {rule: i for i, rule in enumerate(self._production_rules)}
         production_rule_fields = [ProductionRuleField(rule, is_global_rule=True)

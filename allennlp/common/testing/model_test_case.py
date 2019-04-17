@@ -129,6 +129,7 @@ class ModelTestCase(AllenNlpTestCase):
 
         # Both outputs should have the same keys and the values for these keys should be close.
         for key in model_predictions.keys():
+            if key == 'loss': continue
             self.assert_fields_equal(model_predictions[key],
                                      loaded_model_predictions[key],
                                      name=key,
@@ -168,7 +169,7 @@ class ModelTestCase(AllenNlpTestCase):
     def check_model_computes_gradients_correctly(model: Model,
                                                  model_batch: Dict[str, Union[Any, Dict[str, Any]]],
                                                  params_to_ignore: Set[str] = None):
-        print("Checking gradients")
+        print("\nChecking gradients\n")
         model.zero_grad()
         result = model(**model_batch)
         result["loss"].backward()

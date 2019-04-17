@@ -17,6 +17,6 @@ class EndToEndModuleNetworkTest(ModelTestCase):
                           str(self.FIXTURES_ROOT / "data" / "visual_question_answering" / "shapes"
                               / "train.tiny*"))
 
-    #@flaky
+    @flaky
     def test_model_can_train_save_and_load(self):
         self.ensure_model_can_train_save_and_load(self.param_file)
