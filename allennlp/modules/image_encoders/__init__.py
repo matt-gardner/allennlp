@@ -1,1 +1,4 @@
+from allennlp.modules.image_encoders.conv_2d import Conv2d
+from allennlp.modules.image_encoders.convolutional_image_encoder import ConvolutionalImageEncoder
 from allennlp.modules.image_encoders.image_encoder import ImageEncoder
+from allennlp.modules.image_encoders.max_pool_2d import MaxPool2d

@@ -89,6 +89,10 @@ def takes_kwargs(obj) -> bool:
                      for p in signature.parameters.values()]))
 
 
+def is_basic_type(type_: Type) -> bool:
+    return type_ in {str, int, float, bool}
+
+
 def remove_optional(annotation: type):
     """
     Optional[X] annotations are actually represented as Union[X, NoneType].
@@ -277,6 +281,15 @@ def construct_arg(cls: Type[T], # pylint: disable=inconsistent-return-statements
             value_list.append(value_cls.from_params(params=value_params, **subextras))
 
         return tuple(value_list)
+
+    elif origin in (Tuple, tuple) and all(is_basic_type(arg) for arg in args):
+        value_list = params.pop(name, default) if optional else params.pop(name)
+
+        # We could do some type checking on this list, but we'll punt on that for now.
+        if value_list:
+            return tuple(value_list)
+        else:
+            return value_list
 
     elif origin in (Set, set) and len(args) == 1 and hasattr(args[0], 'from_params'):
         value_cls = annotation.__args__[0]
