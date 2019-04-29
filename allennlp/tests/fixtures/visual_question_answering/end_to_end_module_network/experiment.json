@@ -16,7 +16,26 @@
       }
     },
     "image_encoder": {
-      "type": "pass_through"
+      "type": "convolutional",
+      "conv_layers": [
+        {"in_channels": 3,
+          "out_channels": 10,
+          "kernel_size": 10,
+          "stride": 10,
+          "padding": 0
+        },
+        {"in_channels": 10,
+          "out_channels": 2,
+          "kernel_size": 3,
+          "padding": 1
+        }
+      ],
+      "activations": "relu",
+      "max_pool_layers": [
+        {"kernel_size": 2, "stride": 2},
+        "None"
+      ],
+      "dropout": 0.2
     },
     "image_shape": [3, 30, 30],
     "action_embedding_dim": 4,
