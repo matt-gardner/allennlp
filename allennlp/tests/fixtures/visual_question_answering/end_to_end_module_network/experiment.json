@@ -18,16 +18,17 @@
     "image_encoder": {
       "type": "convolutional",
       "conv_layers": [
-        {"in_channels": 3,
+        {
+          "in_channels": 3,
           "out_channels": 10,
           "kernel_size": 10,
           "stride": 10,
           "padding": 0
         },
-        {"in_channels": 10,
+        {
+          "in_channels": 10,
           "out_channels": 2,
-          "kernel_size": 3,
-          "padding": 1
+          "kernel_size": 1
         }
       ],
       "activations": "relu",
@@ -35,7 +36,7 @@
         {"kernel_size": 2, "stride": 2},
         "None"
       ],
-      "dropout": 0.2
+      "dropout": 0.0
     },
     "image_shape": [3, 30, 30],
     "action_embedding_dim": 4,
@@ -56,7 +57,7 @@
     "type": "bucket",
     "sorting_keys": [["utterance", "num_tokens"]],
     "padding_noise": 0.0,
-    "batch_size" : 2
+    "batch_size" : 100
   },
   "trainer": {
     "num_epochs": 2,

@@ -171,6 +171,7 @@ class ModelTestCase(AllenNlpTestCase):
                                                  params_to_ignore: Set[str] = None):
         print("\nChecking gradients\n")
         model.zero_grad()
+        model.train()
         result = model(**model_batch)
         result["loss"].backward()
         has_zero_or_none_grads = {}
