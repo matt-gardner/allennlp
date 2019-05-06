@@ -32,10 +32,6 @@
         }
       ],
       "activations": "relu",
-      "max_pool_layers": [
-        {"kernel_size": 2, "stride": 2},
-        "None"
-      ],
       "dropout": 0.0
     },
     "image_shape": [3, 30, 30],

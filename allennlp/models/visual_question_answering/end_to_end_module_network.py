@@ -71,6 +71,11 @@ class EndToEndModuleNetwork(Model):
     rule_namespace : ``str``, optional (default=rule_labels)
         The vocabulary namespace to use for production rules.  The default corresponds to the
         default used in the dataset reader, so you likely don't need to modify this.
+    num_parse_only_batches : ``int``, optional (default=0)
+        We will use this many training batches of `only` parse supervision, not denotation
+        supervision.  This is helpful in cases where learning the correct programs at the same time
+        as learning the program executor, both from scratch is challenging.  This only works if you
+        have labeled programs.
     use_gold_program_for_eval : ``bool``, optional (default=False)
         If true, we will use the gold program for evaluation when it is available (this only tests
         the program executor, not the parser).
@@ -90,6 +95,7 @@ class EndToEndModuleNetwork(Model):
                  dropout: float = 0.0,
                  rule_namespace: str = 'rule_labels',
                  denotation_namespace: str = 'labels',
+                 num_parse_only_batches: int = 0,
                  use_gold_program_for_eval: bool = False) -> None:
         # Atis semantic parser init
         super().__init__(vocab)
@@ -102,7 +108,9 @@ class EndToEndModuleNetwork(Model):
         self._rule_namespace = rule_namespace
         self._denotation_namespace = denotation_namespace
         self._denotation_accuracy = denotation_namespace
+        self._num_parse_only_batches = num_parse_only_batches
         self._use_gold_program_for_eval = use_gold_program_for_eval
+        self._training_batches_so_far = 0
 
         self._denotation_accuracy = CategoricalAccuracy()
         # TODO(mattg): use FullSequenceMatch instead of this.
@@ -188,7 +196,8 @@ class EndToEndModuleNetwork(Model):
             is pretty limiting, assuming that all possible denotations are known a priori, but it's
             what we do for now).
         """
-        image_features = self._image_encoder(image)
+        if not self.training or self._training_batches_so_far >= self._num_parse_only_batches:
+            image_features = self._image_encoder(image)
         initial_state = self._get_initial_state(utterance, actions)
         batch_size = image.shape[0]
         if target_action_sequence is not None:
@@ -198,6 +207,7 @@ class EndToEndModuleNetwork(Model):
         else:
             target_mask = None
 
+        losses = []
         if (self.training or self._use_gold_program_for_eval) and target_action_sequence is not None:
             # target_action_sequence is of shape (batch_size, 1, sequence_length) here after we
             # unsqueeze it for the MML trainer.
@@ -205,6 +215,12 @@ class EndToEndModuleNetwork(Model):
                                            allowed_sequences=target_action_sequence.unsqueeze(1),
                                            allowed_sequence_mask=target_mask.unsqueeze(1))
             final_states = search.search(initial_state, self._transition_function)
+            if self._training_batches_so_far < self._num_parse_only_batches:
+                for batch_index in range(batch_size):
+                    if not final_states[batch_index]:
+                        logger.error(f'No pogram found for batch index {batch_index}')
+                        continue
+                    losses.append(-final_states[batch_index][0].score[0])
         else:
             final_states = self._beam_search.search(self._max_decoding_steps,
                                                     initial_state,
@@ -219,8 +235,9 @@ class EndToEndModuleNetwork(Model):
         outputs['best_action_sequence'] = []
         outputs['debug_info'] = []
 
-        losses = []
         for batch_index in range(batch_size):
+            if self.training and self._training_batches_so_far < self._num_parse_only_batches:
+                continue
             if not final_states[batch_index]:
                 logger.error(f'No pogram found for batch index {batch_index}')
                 outputs['best_action_sequence'].append([])
@@ -259,6 +276,8 @@ class EndToEndModuleNetwork(Model):
                 self._denotation_accuracy(marginalized_denotation_log_probs, denotation[batch_index])
         if losses:
             outputs['loss'] = torch.stack(losses).mean()
+        if self.training:
+            self._training_batches_so_far += 1
         return outputs
 
     def _get_initial_state(self,
